@@ -2,19 +2,12 @@ use std::ops::BitXor;
 
 use self::consts::STATE_LEN_WORDS;
 
+pub use self::djb::*;
+pub use self::ietf::*;
+
 pub(crate) mod consts;
+mod djb; // DJB original: 64-bit counter, 64-bit nonce
 mod ietf; // RFC 8439 version: 32-bit counter, 96-bit nonce
-mod original; // DJB original: 64-bit counter, 64-bit nonce
-
-pub type ChaChaRng<const ROUNDS: usize> = ietf::IETFChaChaRng<ROUNDS>;
-pub type ChaCha8Rng = ChaChaRng<8>;
-pub type ChaCha12Rng = ChaChaRng<12>;
-pub type ChaCha20Rng = ChaChaRng<20>;
-
-pub type ChaChaCore<const ROUNDS: usize> = ietf::core::IETFChaChaCore<ROUNDS>;
-pub type ChaCha8Core = ChaChaCore<8>;
-pub type ChaCha12Core = ChaChaCore<12>;
-pub type ChaCha20Core = ChaChaCore<20>;
 
 #[inline(always)]
 pub(crate) fn quarter_round(

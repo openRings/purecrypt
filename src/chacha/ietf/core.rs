@@ -17,7 +17,7 @@ impl<const ROUNDS: usize> IETFChaChaCore<ROUNDS> {
     }
 
     #[inline(always)]
-    pub fn get_block(&mut self) -> [u8; STATE_LEN] {
+    pub fn generate_block(&mut self) -> [u8; STATE_LEN] {
         let mut working = self.0;
 
         for _ in 0..(ROUNDS / 2) {
@@ -32,6 +32,10 @@ impl<const ROUNDS: usize> IETFChaChaCore<ROUNDS> {
 
         // SAFETY: The arrays have identical size, and `[u8]` has compatible (smaller) alignment.
         unsafe { core::mem::transmute::<[u32; STATE_LEN_WORDS], [u8; STATE_LEN]>(working) }
+    }
+
+    pub fn get_state(&self) -> &[u32; STATE_LEN_WORDS] {
+        &self.0
     }
 
     pub fn get_key(&self) -> [u8; KEY_LEN] {

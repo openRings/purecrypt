@@ -81,7 +81,7 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
 
     #[inline(always)]
     fn refill(&mut self) {
-        self.buffer = self.core.get_block();
+        self.buffer = self.core.generate_block();
         self.buffer_pos = 0;
     }
 }

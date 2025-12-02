@@ -7,5 +7,10 @@ description = "Minimal, readable, dependency-free implementations of modern cryp
 keywords = ["crypto", "cryptography"]
 license = "MIT"
 
+[features]
+default = ["rand"]
+rand = ["rand_core"]
+
 [dependencies]
+rand_core = { version = "0.9", optional = true }
 

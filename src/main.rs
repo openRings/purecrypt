@@ -1,9 +1,9 @@
-use purecrypt::chacha::ChaCha20Rng;
-use rand_core::{RngCore, SeedableRng};
+use purecrypt::chacha::{ChaCha20Rng, Seed};
 
 fn main() {
     let mut buf = vec![0_u8; 1024 * 1024 * 1024];
-    let mut rng = ChaCha20Rng::from_seed(Default::default());
+    let seed = Seed::default();
+    let mut rng = ChaCha20Rng::from_seed(&seed);
 
     let now = std::time::Instant::now();
 
@@ -11,5 +11,9 @@ fn main() {
 
     let elapsed = now.elapsed();
 
-    println!("elasped: {elapsed:?}, first bytes: {:?}", &buf[0..8]);
+    println!(
+        "elasped: {elapsed:?}, \nfirst bytes: {:?}, \nlast bytes: {:?}",
+        &buf[0..8],
+        &buf[buf.len() - 8..buf.len()]
+    );
 }

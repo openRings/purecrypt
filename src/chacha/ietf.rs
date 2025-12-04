@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+pub use self::types::{Nonce, StreamId};
+
 const NONCE_LEN: usize = 12;
 #[allow(dead_code)]
 const COUNTER_LEN: usize = 4;
@@ -9,6 +11,7 @@ const NONCE_RANGE: Range<usize> = 13..16;
 
 mod core;
 mod rng;
+mod types;
 
 pub type ChaChaRng<const ROUNDS: usize> = rng::IETFChaChaRng<ROUNDS>;
 pub type ChaCha8Rng = ChaChaRng<8>;

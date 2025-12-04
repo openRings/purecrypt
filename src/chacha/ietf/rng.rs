@@ -1,11 +1,17 @@
-use rand_core::{RngCore, SeedableRng};
+#[cfg(feature = "rand")]
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 
-use super::NONCE_LEN;
+#[cfg(feature = "zeroize")]
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
 use super::core::IETFChaChaCore;
-use crate::chacha::consts::*;
+use super::{NONCE_LEN, types::StreamId};
+use crate::chacha::{Constants, Seed, consts::*};
 
 const DEFAULT_STREAM_ID: [u8; NONCE_LEN] = [0; NONCE_LEN];
 
+#[derive(Clone)]
+#[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 pub struct IETFChaChaRng<const ROUNDS: usize> {
     core: IETFChaChaCore<ROUNDS>,
     buffer: [u8; OUTPUT_LEN],
@@ -15,14 +21,14 @@ pub struct IETFChaChaRng<const ROUNDS: usize> {
 impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
     pub fn new<K, N>(seed: K, stream_id: N) -> Self
     where
-        K: Into<[u8; KEY_LEN]>,
-        N: Into<[u8; NONCE_LEN]>,
+        K: Into<Seed>,
+        N: Into<StreamId>,
     {
-        let key = seed.into();
-        let nonce = stream_id.into();
+        let key = seed.into().into_key();
+        let nonce = stream_id.into().into_nonce();
 
         let buffer = [0; OUTPUT_LEN];
-        let core = IETFChaChaCore::new(key, nonce);
+        let core = IETFChaChaCore::new(&key, &nonce);
         let buffer_pos = buffer.len();
 
         Self {
@@ -32,17 +38,26 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
         }
     }
 
+    pub fn from_seed<S>(seed: S) -> Self
+    where
+        S: Into<Seed>,
+    {
+        Self::new(seed, StreamId::new(DEFAULT_STREAM_ID))
+    }
+
     #[inline]
-    pub fn get_stream_id(&self) -> [u8; NONCE_LEN] {
-        self.core.get_nonce()
+    pub fn get_stream_id(&self) -> StreamId {
+        self.core.get_nonce().into_stream_id()
     }
 
     #[inline]
     pub fn set_stream_id<S>(&mut self, stream_id: S)
     where
-        S: Into<[u8; NONCE_LEN]>,
+        S: Into<StreamId>,
     {
-        self.core.set_nonce(stream_id.into());
+        let nonce = stream_id.into().into_nonce();
+
+        self.core.set_nonce(&nonce);
     }
 
     #[inline]
@@ -55,8 +70,8 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_seed(&self) -> [u8; KEY_LEN] {
-        self.core.get_key()
+    pub fn get_seed(&self) -> Seed {
+        self.core.get_key().into_seed()
     }
 
     #[inline]
@@ -68,40 +83,18 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_constants(&self) -> [u8; CONSTANTS_LEN] {
+    pub fn get_constants(&self) -> Constants {
         self.core.get_constants()
     }
 
     pub fn set_constants<C>(&mut self, constants: C)
     where
-        C: Into<[u8; CONSTANTS_LEN]>,
+        C: Into<Constants>,
     {
-        self.core.set_constants(constants.into());
+        self.core.set_constants(&constants.into());
     }
 
-    #[inline(always)]
-    fn refill(&mut self) {
-        self.buffer = self.core.generate_block();
-        self.buffer_pos = 0;
-    }
-}
-
-impl<const ROUNDS: usize> RngCore for IETFChaChaRng<ROUNDS> {
-    fn next_u32(&mut self) -> u32 {
-        let mut buf = [0; (u32::BITS / 8) as usize];
-        self.fill_bytes(&mut buf);
-
-        u32::from_le_bytes(buf)
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        let mut buf = [0; (u64::BITS / 8) as usize];
-        self.fill_bytes(&mut buf);
-
-        u64::from_le_bytes(buf)
-    }
-
-    fn fill_bytes(&mut self, mut dst: &mut [u8]) {
+    pub fn fill_bytes(&mut self, mut dst: &mut [u8]) {
         // use the remaining buffer
         if self.buffer_pos < 64 {
             let take = dst.len().min(64 - self.buffer_pos);
@@ -125,12 +118,43 @@ impl<const ROUNDS: usize> RngCore for IETFChaChaRng<ROUNDS> {
             self.buffer_pos = n;
         }
     }
+
+    #[inline(always)]
+    fn refill(&mut self) {
+        self.core.generate_block(&mut self.buffer);
+        self.buffer_pos = 0;
+    }
 }
 
+#[cfg(feature = "rand")]
+impl<const ROUNDS: usize> RngCore for IETFChaChaRng<ROUNDS> {
+    fn next_u32(&mut self) -> u32 {
+        let mut buf = [0; (u32::BITS / 8) as usize];
+        self.fill_bytes(&mut buf);
+
+        u32::from_le_bytes(buf)
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let mut buf = [0; (u64::BITS / 8) as usize];
+        self.fill_bytes(&mut buf);
+
+        u64::from_le_bytes(buf)
+    }
+
+    fn fill_bytes(&mut self, dst: &mut [u8]) {
+        self.fill_bytes(dst);
+    }
+}
+
+#[cfg(feature = "rand")]
+impl<const ROUNDS: usize> CryptoRng for IETFChaChaRng<ROUNDS> {}
+
+#[cfg(feature = "rand")]
 impl<const ROUNDS: usize> SeedableRng for IETFChaChaRng<ROUNDS> {
-    type Seed = [u8; KEY_LEN];
+    type Seed = Seed;
 
     fn from_seed(seed: Self::Seed) -> Self {
-        Self::new(seed, DEFAULT_STREAM_ID)
+        Self::from_seed(seed)
     }
 }

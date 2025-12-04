@@ -1,10 +1,11 @@
-use rand_core::{RngCore, SeedableRng};
+#[cfg(feature = "rand")]
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 
-use super::NONCE_LEN;
 use super::core::DjbChaChaCore;
-use crate::chacha::consts::*;
+use crate::chacha::types::Seed;
+use crate::chacha::{Constants, consts::*};
 
-const DEFAULT_STREAM_ID: [u8; NONCE_LEN] = [0; NONCE_LEN];
+const DEFAULT_STREAM_ID: u64 = 0;
 
 pub struct DjbChaChaRng<const ROUNDS: usize> {
     core: DjbChaChaCore<ROUNDS>,
@@ -13,16 +14,14 @@ pub struct DjbChaChaRng<const ROUNDS: usize> {
 }
 
 impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
-    pub fn new<K, N>(seed: K, stream_id: N) -> Self
+    pub fn new<S>(seed: S, stream_id: u64) -> Self
     where
-        K: Into<[u8; KEY_LEN]>,
-        N: Into<[u8; NONCE_LEN]>,
+        S: Into<Seed>,
     {
-        let key = seed.into();
-        let nonce = stream_id.into();
+        let key = seed.into().into_key();
 
         let buffer = [0; OUTPUT_LEN];
-        let core = DjbChaChaCore::new(key, nonce);
+        let core = DjbChaChaCore::new(&key, stream_id);
         let buffer_pos = buffer.len();
 
         Self {
@@ -30,6 +29,14 @@ impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
             buffer,
             buffer_pos,
         }
+    }
+
+    #[inline]
+    pub fn from_seed<S>(seed: S) -> Self
+    where
+        S: Into<Seed>,
+    {
+        Self::new(seed, DEFAULT_STREAM_ID)
     }
 
     #[inline]
@@ -57,42 +64,74 @@ impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
         self.core.get_counter()
     }
 
+    #[inline]
     pub fn set_counter(&mut self, counter: u64) {
         self.core.set_counter(counter);
     }
 
     #[inline]
-    pub fn get_seed(&self) -> [u8; KEY_LEN] {
-        self.core.get_key()
+    pub fn get_seed(&self) -> Seed {
+        self.core.get_key().into_seed()
     }
 
     #[inline]
     pub fn set_seed<S>(&mut self, seed: S)
     where
-        S: Into<[u8; KEY_LEN]>,
+        S: Into<Seed>,
     {
-        self.core.set_key(seed.into());
+        let key = seed.into().into_key();
+
+        self.core.set_key(&key);
     }
 
     #[inline]
-    pub fn get_constants(&self) -> [u8; CONSTANTS_LEN] {
+    pub fn get_constants(&self) -> Constants {
         self.core.get_constants()
     }
 
+    #[inline]
     pub fn set_constants<C>(&mut self, constants: C)
     where
-        C: Into<[u8; CONSTANTS_LEN]>,
+        C: Into<Constants>,
     {
-        self.core.set_constants(constants.into());
+        self.core.set_constants(&constants.into());
+    }
+
+    pub fn fill_bytes(&mut self, mut dst: &mut [u8]) {
+        const BLOCK_SIZE: usize = 64;
+
+        // use the remaining buffer
+        if self.buffer_pos < BLOCK_SIZE {
+            let take = dst.len().min(BLOCK_SIZE - self.buffer_pos);
+            dst[..take].copy_from_slice(&self.buffer[self.buffer_pos..self.buffer_pos + take]);
+            self.buffer_pos += take;
+            dst = &mut dst[take..];
+        }
+
+        // filling in the main part of the dst
+        while dst.len() >= BLOCK_SIZE {
+            self.core.generate_block(&mut dst[..BLOCK_SIZE]);
+            dst = &mut dst[BLOCK_SIZE..];
+        }
+
+        // filling in the tail
+        if !dst.is_empty() {
+            self.refill();
+            let n = dst.len();
+            dst.copy_from_slice(&self.buffer[..n]);
+            self.buffer_pos = n;
+        }
     }
 
     #[inline(always)]
     fn refill(&mut self) {
-        self.buffer = self.core.generate_block();
+        self.core.generate_block(&mut self.buffer);
+
         self.buffer_pos = 0;
     }
 }
 
+#[cfg(feature = "rand")]
 impl<const ROUNDS: usize> RngCore for DjbChaChaRng<ROUNDS> {
     fn next_u32(&mut self) -> u32 {
         let mut buf = [0; (u32::BITS / 8) as usize];
@@ -108,36 +147,19 @@ impl<const ROUNDS: usize> RngCore for DjbChaChaRng<ROUNDS> {
         u64::from_le_bytes(buf)
     }
 
-    fn fill_bytes(&mut self, mut dst: &mut [u8]) {
-        // use the remaining buffer
-        if self.buffer_pos < 64 {
-            let take = dst.len().min(64 - self.buffer_pos);
-            dst[..take].copy_from_slice(&self.buffer[self.buffer_pos..self.buffer_pos + take]);
-            self.buffer_pos += take;
-            dst = &mut dst[take..];
-        }
-
-        // filling in the main part of the dst
-        while dst.len() >= 64 {
-            self.refill();
-            dst[..64].copy_from_slice(&self.buffer);
-            dst = &mut dst[64..];
-        }
-
-        // filling in the tail
-        if !dst.is_empty() {
-            self.refill();
-            let n = dst.len();
-            dst.copy_from_slice(&self.buffer[..n]);
-            self.buffer_pos = n;
-        }
+    fn fill_bytes(&mut self, dst: &mut [u8]) {
+        self.fill_bytes(dst);
     }
 }
 
+#[cfg(feature = "rand")]
+impl<const ROUNDS: usize> CryptoRng for DjbChaChaRng<ROUNDS> {}
+
+#[cfg(feature = "rand")]
 impl<const ROUNDS: usize> SeedableRng for DjbChaChaRng<ROUNDS> {
-    type Seed = [u8; KEY_LEN];
+    type Seed = Seed;
 
     fn from_seed(seed: Self::Seed) -> Self {
-        Self::new(seed, DEFAULT_STREAM_ID)
+        Self::from_seed(seed)
     }
 }

@@ -1,24 +1,33 @@
+#[cfg(feature = "zeroize")]
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
 use super::COUNTER_LEN;
 use super::{COUNTER_RANGE, NONCE_LEN, NONCE_RANGE};
-use crate::chacha::consts::*;
 use crate::chacha::full_round;
+use crate::chacha::types::Key;
+use crate::chacha::{Constants, consts::*};
 use crate::utils::{bytes_to_words, words_to_bytes};
 
+#[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 pub struct DjbChaChaCore<const ROUNDS: usize>([u32; STATE_LEN_WORDS]);
 
 impl<const ROUNDS: usize> DjbChaChaCore<ROUNDS> {
-    pub fn new(key: [u8; KEY_LEN], nonce: [u8; NONCE_LEN]) -> Self {
+    #[allow(unused_mut)]
+    pub fn new(key: &Key, mut nonce: u64) -> Self {
         let mut state = [0_u32; STATE_LEN_WORDS];
 
         bytes_to_words(&DEFAULT_CONSTANTS, &mut state[CONSTANTS_RANGE]);
-        bytes_to_words(&key, &mut state[KEY_RANGE]);
-        bytes_to_words(&nonce, &mut state[NONCE_RANGE]);
+        bytes_to_words(key.bytes(), &mut state[KEY_RANGE]);
+        bytes_to_words(&nonce.to_le_bytes(), &mut state[NONCE_RANGE]);
+
+        #[cfg(feature = "zeroize")]
+        nonce.zeroize();
 
         Self(state)
     }
 
     #[inline(always)]
-    pub fn generate_block(&mut self) -> [u8; STATE_LEN] {
+    pub fn generate_block(&mut self, dst: &mut [u8]) {
         let mut working = self.0;
 
         for _ in 0..(ROUNDS / 2) {
@@ -38,34 +47,36 @@ impl<const ROUNDS: usize> DjbChaChaCore<ROUNDS> {
             self.0[COUNTER_H] = self.0[COUNTER_H].wrapping_add(1)
         }
 
-        // SAFETY: The arrays have identical size, and `[u8]` has compatible (smaller) alignment.
-        unsafe { core::mem::transmute::<[u32; STATE_LEN_WORDS], [u8; STATE_LEN]>(working) }
+        words_to_bytes(&working, dst);
+
+        #[cfg(feature = "zeroize")]
+        working.zeroize();
     }
 
     pub fn get_state(&self) -> &[u32; STATE_LEN_WORDS] {
         &self.0
     }
 
-    pub fn get_key(&self) -> [u8; KEY_LEN] {
-        let mut key = [0; KEY_LEN];
-        words_to_bytes(&self.0[KEY_RANGE], &mut key);
+    pub fn get_key(&self) -> Key {
+        let mut key = Key::default();
+        words_to_bytes(&self.0[KEY_RANGE], key.bytes_mut());
 
         key
     }
 
-    pub fn set_key(&mut self, key: [u8; KEY_LEN]) {
-        bytes_to_words(&key, &mut self.0[KEY_RANGE]);
+    pub fn set_key(&mut self, key: &Key) {
+        bytes_to_words(key.bytes(), &mut self.0[KEY_RANGE]);
     }
 
-    pub fn get_constants(&self) -> [u8; CONSTANTS_LEN] {
-        let mut constants = [0; CONSTANTS_LEN];
-        words_to_bytes(&self.0[CONSTANTS_RANGE], &mut constants);
+    pub fn get_constants(&self) -> Constants {
+        let mut constants = Constants::default();
+        words_to_bytes(&self.0[CONSTANTS_RANGE], constants.bytes_mut());
 
         constants
     }
 
-    pub fn set_constants(&mut self, constants: [u8; CONSTANTS_LEN]) {
-        bytes_to_words(&constants, &mut self.0[CONSTANTS_RANGE]);
+    pub fn set_constants(&mut self, constants: &Constants) {
+        bytes_to_words(constants.bytes(), &mut self.0[CONSTANTS_RANGE]);
     }
 
     pub fn get_counter(&self) -> u64 {

@@ -25,7 +25,6 @@ pub(crate) const fn bytes4_to_word(bytes: [u8; 4]) -> u32 {
         | ((bytes[3] as u32) << 24)
 }
 
-#[macro_export]
 macro_rules! generate_bytes_to_words {
     ($fn_name:ident, $words:expr) => {
         #[inline(always)]
@@ -50,3 +49,51 @@ generate_bytes_to_words!(bytes8_to_words2, 2);
 generate_bytes_to_words!(bytes12_to_words3, 3);
 generate_bytes_to_words!(bytes16_to_words4, 4);
 generate_bytes_to_words!(bytes32_to_words8, 8);
+
+macro_rules! bytes_wrapper_impl {
+    ($struct_name:ident, $len:ident) => {
+        impl $struct_name {
+            #[inline]
+            pub fn new<B>(bytes: B) -> Self
+            where
+                B: Into<[u8; $len]>,
+            {
+                Self(bytes.into())
+            }
+
+            #[inline]
+            pub fn bytes(&self) -> &[u8; $len] {
+                &self.0
+            }
+
+            #[inline]
+            pub fn bytes_mut(&mut self) -> &mut [u8; $len] {
+                &mut self.0
+            }
+        }
+
+        impl From<&$struct_name> for $struct_name {
+            fn from(value: &$struct_name) -> Self {
+                value.clone()
+            }
+        }
+
+        impl From<[u8; $len]> for $struct_name {
+            fn from(value: [u8; $len]) -> Self {
+                Self(value)
+            }
+        }
+
+        impl AsRef<[u8]> for $struct_name {
+            fn as_ref(&self) -> &[u8] {
+                self.bytes()
+            }
+        }
+
+        impl AsMut<[u8]> for $struct_name {
+            fn as_mut(&mut self) -> &mut [u8] {
+                self.bytes_mut()
+            }
+        }
+    };
+}

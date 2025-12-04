@@ -1,6 +1,6 @@
 [package]
 name = "purecrypt"
-version = "0.0.0-alpha"
+version = "0.1.0-alpha"
 edition = "2024"
 repository = "https://github.com/openRings/purecrypt"
 description = "Minimal, readable, dependency-free implementations of modern cryptographic primitives in pure Rust"

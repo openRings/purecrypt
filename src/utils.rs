@@ -1,18 +1,23 @@
 #[inline(always)]
-pub(crate) fn bytes_to_words(src: &[u8], dest: &mut [u32]) {
+pub(crate) fn bytes_to_words(src: &[u8], dst: &mut [u32]) {
     for (i, chunk) in src.chunks_exact(4).enumerate() {
-        dest[i] = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        dst[i] = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
     }
 }
 
 #[inline(always)]
-pub(crate) fn words_to_bytes(src: &[u32], dest: &mut [u8]) {
-    for (i, &w) in src.iter().enumerate() {
-        let b = w.to_le_bytes();
-        dest[i * 4] = b[0];
-        dest[i * 4 + 1] = b[1];
-        dest[i * 4 + 2] = b[2];
-        dest[i * 4 + 3] = b[3];
+pub(crate) fn words_to_bytes(src: &[u32], dst: &mut [u8]) {
+    #[cfg(target_endian = "little")]
+    {
+        let bytes = unsafe { std::slice::from_raw_parts(src.as_ptr() as *const u8, src.len() * 4) };
+        dst.copy_from_slice(bytes);
+    }
+
+    #[cfg(target_endian = "big")]
+    {
+        for (i, &word) in src.iter().enumerate() {
+            dst[i * 4..i * 4 + 4].copy_from_slice(&word.to_le_bytes());
+        }
     }
 }
 
@@ -53,28 +58,28 @@ generate_bytes_to_words!(bytes32_to_words8, 8);
 macro_rules! bytes_wrapper_impl {
     ($struct_name:ident, $len:ident) => {
         impl $struct_name {
-            #[inline]
-            pub fn new<B>(bytes: B) -> Self
-            where
-                B: Into<[u8; $len]>,
-            {
-                Self(bytes.into())
+            pub const fn new(bytes: [u8; $len]) -> Self {
+                Self(bytes)
             }
 
-            #[inline]
-            pub fn bytes(&self) -> &[u8; $len] {
+            pub const fn new_ref(bytes: &[u8; $len]) -> &Self {
+                // SAFETY: Self shares the exact layout with [u8; $len]
+                unsafe { std::mem::transmute::<&[u8; $len], &Self>(bytes) }
+            }
+
+            pub const fn from_words_ref(words: &[u32; $len / 4]) -> &Self {
+                const _: () = assert!($len % 4 == 0);
+
+                // SAFETY: Self shares the exact layout with [u8; $len]
+                unsafe { std::mem::transmute::<&[u32; $len / 4], &Self>(words) }
+            }
+
+            pub const fn bytes(&self) -> &[u8; $len] {
                 &self.0
             }
 
-            #[inline]
-            pub fn bytes_mut(&mut self) -> &mut [u8; $len] {
+            pub const fn bytes_mut(&mut self) -> &mut [u8; $len] {
                 &mut self.0
-            }
-        }
-
-        impl From<&$struct_name> for $struct_name {
-            fn from(value: &$struct_name) -> Self {
-                value.clone()
             }
         }
 

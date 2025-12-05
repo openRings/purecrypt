@@ -4,11 +4,13 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
+use super::NONCE_LEN;
 use super::core::IETFChaChaCore;
-use super::{NONCE_LEN, types::StreamId};
-use crate::chacha::{Constants, Seed, consts::*};
+use super::types::StreamId;
+use crate::chacha::consts::*;
+use crate::chacha::{Constants, Seed};
 
-const DEFAULT_STREAM_ID: [u8; NONCE_LEN] = [0; NONCE_LEN];
+const DEFAULT_STREAM_ID: StreamId = StreamId::new([0; NONCE_LEN]);
 
 #[derive(Clone)]
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
@@ -19,16 +21,9 @@ pub struct IETFChaChaRng<const ROUNDS: usize> {
 }
 
 impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
-    pub fn new<K, N>(seed: K, stream_id: N) -> Self
-    where
-        K: Into<Seed>,
-        N: Into<StreamId>,
-    {
-        let key = seed.into().into_key();
-        let nonce = stream_id.into().into_nonce();
-
+    pub fn new(seed: &Seed, stream_id: &StreamId) -> Self {
         let buffer = [0; OUTPUT_LEN];
-        let core = IETFChaChaCore::new(&key, &nonce);
+        let core = IETFChaChaCore::new(seed.bytes(), stream_id.bytes());
         let buffer_pos = buffer.len();
 
         Self {
@@ -38,26 +33,18 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
         }
     }
 
-    pub fn from_seed<S>(seed: S) -> Self
-    where
-        S: Into<Seed>,
-    {
-        Self::new(seed, StreamId::new(DEFAULT_STREAM_ID))
+    pub fn from_seed(seed: &Seed) -> Self {
+        Self::new(seed, &DEFAULT_STREAM_ID)
     }
 
     #[inline]
-    pub fn get_stream_id(&self) -> StreamId {
-        self.core.get_nonce().into_stream_id()
+    pub fn get_stream_id(&self) -> &StreamId {
+        StreamId::from_words_ref(self.core.get_nonce())
     }
 
     #[inline]
-    pub fn set_stream_id<S>(&mut self, stream_id: S)
-    where
-        S: Into<StreamId>,
-    {
-        let nonce = stream_id.into().into_nonce();
-
-        self.core.set_nonce(&nonce);
+    pub fn set_stream_id(&mut self, stream_id: &StreamId) {
+        self.core.set_nonce(stream_id.bytes());
     }
 
     #[inline]
@@ -70,8 +57,8 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_seed(&self) -> Seed {
-        self.core.get_key().into_seed()
+    pub fn get_seed(&self) -> &Seed {
+        Seed::from_words_ref(self.core.get_key())
     }
 
     #[inline]
@@ -83,31 +70,29 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_constants(&self) -> Constants {
-        self.core.get_constants()
+    pub fn get_constants(&self) -> &Constants {
+        Constants::from_words_ref(self.core.get_constants())
     }
 
-    pub fn set_constants<C>(&mut self, constants: C)
-    where
-        C: Into<Constants>,
-    {
-        self.core.set_constants(&constants.into());
+    pub fn set_constants(&mut self, constants: &Constants) {
+        self.core.set_constants(constants.bytes());
     }
 
     pub fn fill_bytes(&mut self, mut dst: &mut [u8]) {
+        const BLOCK_SIZE: usize = 64;
+
         // use the remaining buffer
-        if self.buffer_pos < 64 {
-            let take = dst.len().min(64 - self.buffer_pos);
+        if self.buffer_pos < BLOCK_SIZE {
+            let take = dst.len().min(BLOCK_SIZE - self.buffer_pos);
             dst[..take].copy_from_slice(&self.buffer[self.buffer_pos..self.buffer_pos + take]);
             self.buffer_pos += take;
             dst = &mut dst[take..];
         }
 
         // filling in the main part of the dst
-        while dst.len() >= 64 {
-            self.refill();
-            dst[..64].copy_from_slice(&self.buffer);
-            dst = &mut dst[64..];
+        while dst.len() >= BLOCK_SIZE {
+            self.core.generate_block(&mut dst[..BLOCK_SIZE]);
+            dst = &mut dst[BLOCK_SIZE..];
         }
 
         // filling in the tail
@@ -155,6 +140,6 @@ impl<const ROUNDS: usize> SeedableRng for IETFChaChaRng<ROUNDS> {
     type Seed = Seed;
 
     fn from_seed(seed: Self::Seed) -> Self {
-        Self::from_seed(seed)
+        Self::from_seed(&seed)
     }
 }

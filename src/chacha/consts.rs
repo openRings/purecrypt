@@ -4,6 +4,9 @@ pub const CONSTANTS_LEN: usize = 16;
 pub const KEY_LEN: usize = 32;
 pub const STATE_LEN: usize = 64;
 pub const OUTPUT_LEN: usize = 64;
+
+pub const CONSTANTS_LEN_WORDS: usize = CONSTANTS_LEN / 4;
+pub const KEY_LEN_WORDS: usize = KEY_LEN / 4;
 pub const STATE_LEN_WORDS: usize = STATE_LEN / 4;
 
 pub const CONSTANTS_RANGE: Range<usize> = 0..4;

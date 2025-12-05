@@ -3,8 +3,7 @@ use std::ops::Range;
 pub use self::types::{Nonce, StreamId};
 
 const NONCE_LEN: usize = 12;
-#[allow(dead_code)]
-const COUNTER_LEN: usize = 4;
+const NONCE_LEN_WORDS: usize = NONCE_LEN / 4;
 
 const COUNTER_RANGE: Range<usize> = 12..13;
 const NONCE_RANGE: Range<usize> = 13..16;

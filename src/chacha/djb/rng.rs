@@ -14,14 +14,9 @@ pub struct DjbChaChaRng<const ROUNDS: usize> {
 }
 
 impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
-    pub fn new<S>(seed: S, stream_id: u64) -> Self
-    where
-        S: Into<Seed>,
-    {
-        let key = seed.into().into_key();
-
+    pub fn new(seed: &Seed, stream_id: u64) -> Self {
         let buffer = [0; OUTPUT_LEN];
-        let core = DjbChaChaCore::new(&key, stream_id);
+        let core = DjbChaChaCore::new(seed.bytes(), stream_id);
         let buffer_pos = buffer.len();
 
         Self {
@@ -32,10 +27,7 @@ impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn from_seed<S>(seed: S) -> Self
-    where
-        S: Into<Seed>,
-    {
+    pub fn from_seed(seed: &Seed) -> Self {
         Self::new(seed, DEFAULT_STREAM_ID)
     }
 
@@ -70,31 +62,23 @@ impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_seed(&self) -> Seed {
-        self.core.get_key().into_seed()
+    pub fn get_seed(&self) -> &Seed {
+        Seed::from_words_ref(self.core.get_key())
     }
 
     #[inline]
-    pub fn set_seed<S>(&mut self, seed: S)
-    where
-        S: Into<Seed>,
-    {
-        let key = seed.into().into_key();
-
-        self.core.set_key(&key);
+    pub fn set_seed(&mut self, seed: &Seed) {
+        self.core.set_key(seed.bytes());
     }
 
     #[inline]
-    pub fn get_constants(&self) -> Constants {
-        self.core.get_constants()
+    pub fn get_constants(&self) -> &Constants {
+        Constants::from_words_ref(self.core.get_constants())
     }
 
     #[inline]
-    pub fn set_constants<C>(&mut self, constants: C)
-    where
-        C: Into<Constants>,
-    {
-        self.core.set_constants(&constants.into());
+    pub fn set_constants(&mut self, constants: &Constants) {
+        self.core.set_constants(constants.bytes());
     }
 
     pub fn fill_bytes(&mut self, mut dst: &mut [u8]) {
@@ -126,7 +110,6 @@ impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
     #[inline(always)]
     fn refill(&mut self) {
         self.core.generate_block(&mut self.buffer);
-
         self.buffer_pos = 0;
     }
 }
@@ -160,6 +143,6 @@ impl<const ROUNDS: usize> SeedableRng for DjbChaChaRng<ROUNDS> {
     type Seed = Seed;
 
     fn from_seed(seed: Self::Seed) -> Self {
-        Self::from_seed(seed)
+        Self::from_seed(&seed)
     }
 }

@@ -1,12 +1,10 @@
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use super::Nonce;
-use super::{COUNTER_RANGE, NONCE_RANGE};
-use crate::chacha::Constants;
-use crate::chacha::Key;
+use super::{COUNTER_RANGE, NONCE_LEN, NONCE_RANGE};
 use crate::chacha::consts::*;
 use crate::chacha::full_round;
+use crate::chacha::ietf::NONCE_LEN_WORDS;
 use crate::utils::{bytes_to_words, words_to_bytes};
 
 #[derive(Clone)]
@@ -14,12 +12,12 @@ use crate::utils::{bytes_to_words, words_to_bytes};
 pub struct IETFChaChaCore<const ROUNDS: usize>([u32; STATE_LEN_WORDS]);
 
 impl<const ROUNDS: usize> IETFChaChaCore<ROUNDS> {
-    pub fn new(key: &Key, nonce: &Nonce) -> Self {
+    pub fn new(key: &[u8; KEY_LEN], nonce: &[u8; NONCE_LEN]) -> Self {
         let mut state = [0_u32; STATE_LEN_WORDS];
 
         bytes_to_words(&DEFAULT_CONSTANTS, &mut state[CONSTANTS_RANGE]);
-        bytes_to_words(key.bytes(), &mut state[KEY_RANGE]);
-        bytes_to_words(nonce.bytes(), &mut state[NONCE_RANGE]);
+        bytes_to_words(key, &mut state[KEY_RANGE]);
+        bytes_to_words(nonce, &mut state[NONCE_RANGE]);
 
         Self(state)
     }
@@ -44,30 +42,32 @@ impl<const ROUNDS: usize> IETFChaChaCore<ROUNDS> {
         working.zeroize();
     }
 
-    pub fn get_state(&self) -> &[u32; STATE_LEN_WORDS] {
+    pub const fn get_state(&self) -> &[u32; STATE_LEN_WORDS] {
         &self.0
     }
 
-    pub fn get_key(&self) -> Key {
-        let mut key = Key::default();
-        words_to_bytes(&self.0[KEY_RANGE], key.bytes_mut());
+    pub fn get_key(&self) -> &[u32; KEY_LEN_WORDS] {
+        let slice = &self.0[KEY_RANGE];
+        debug_assert_eq!(slice.len(), KEY_LEN_WORDS);
 
-        key
+        // SAFETY: the slice has exactly len properly aligned u32
+        unsafe { &*(slice.as_ptr() as *const [u32; KEY_LEN_WORDS]) }
     }
 
     pub fn set_key(&mut self, key: [u8; KEY_LEN]) {
         bytes_to_words(&key, &mut self.0[KEY_RANGE]);
     }
 
-    pub fn get_constants(&self) -> Constants {
-        let mut constants = Constants::default();
-        words_to_bytes(&self.0[CONSTANTS_RANGE], constants.bytes_mut());
+    pub fn get_constants(&self) -> &[u32; CONSTANTS_LEN_WORDS] {
+        let slice = &self.0[CONSTANTS_RANGE];
+        debug_assert_eq!(slice.len(), CONSTANTS_LEN_WORDS);
 
-        constants
+        // SAFETY: the slice has exactly len properly aligned u32
+        unsafe { &*(slice.as_ptr() as *const [u32; CONSTANTS_LEN_WORDS]) }
     }
 
-    pub fn set_constants(&mut self, constants: &Constants) {
-        bytes_to_words(constants.bytes(), &mut self.0[CONSTANTS_RANGE]);
+    pub fn set_constants(&mut self, constants: &[u8; CONSTANTS_LEN]) {
+        bytes_to_words(constants, &mut self.0[CONSTANTS_RANGE]);
     }
 
     pub fn get_counter(&self) -> u32 {
@@ -78,14 +78,15 @@ impl<const ROUNDS: usize> IETFChaChaCore<ROUNDS> {
         self.0[COUNTER_RANGE.start] = value
     }
 
-    pub fn get_nonce(&self) -> Nonce {
-        let mut nonce = Nonce::default();
-        words_to_bytes(&self.0[NONCE_RANGE], nonce.bytes_mut());
+    pub fn get_nonce(&self) -> &[u32; NONCE_LEN_WORDS] {
+        let slice = &self.0[NONCE_RANGE];
+        debug_assert_eq!(slice.len(), NONCE_LEN_WORDS);
 
-        nonce
+        // SAFETY: the slice has exactly len properly aligned u32
+        unsafe { &*(slice.as_ptr() as *const [u32; NONCE_LEN_WORDS]) }
     }
 
-    pub fn set_nonce(&mut self, nonce: &Nonce) {
-        bytes_to_words(nonce.bytes(), &mut self.0[NONCE_RANGE]);
+    pub fn set_nonce(&mut self, nonce: &[u8; NONCE_LEN]) {
+        bytes_to_words(nonce, &mut self.0[NONCE_RANGE]);
     }
 }

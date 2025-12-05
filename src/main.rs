@@ -1,9 +1,8 @@
-use purecrypt::chacha::{ChaCha20Rng, Seed};
+use purecrypt::chacha::ChaCha20Rng;
 
 fn main() {
     let mut buf = vec![0_u8; 1024 * 1024 * 1024];
-    let seed = Seed::default();
-    let mut rng = ChaCha20Rng::from_seed(&seed);
+    let mut rng = ChaCha20Rng::from_seed(&Default::default());
 
     let now = std::time::Instant::now();
 

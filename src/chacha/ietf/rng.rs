@@ -33,8 +33,60 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
         }
     }
 
+    #[inline]
     pub fn from_seed(seed: &Seed) -> Self {
         Self::new(seed, &DEFAULT_STREAM_ID)
+    }
+
+    #[inline]
+    pub fn get_constants(&self) -> &Constants {
+        Constants::from_words_ref(self.core.get_constants())
+    }
+
+    #[inline]
+    pub fn set_constants(&mut self, constants: &Constants) {
+        self.core.set_constants(constants.bytes());
+    }
+
+    #[inline]
+    pub fn with_constants(mut self, constants: &Constants) -> Self {
+        self.set_constants(constants);
+
+        self
+    }
+
+    #[inline]
+    pub fn get_seed(&self) -> &Seed {
+        Seed::from_words_ref(self.core.get_key())
+    }
+
+    #[inline]
+    pub fn set_seed(&mut self, seed: &Seed) {
+        self.core.set_key(seed.bytes());
+    }
+
+    #[inline]
+    pub fn with_seed(mut self, seed: &Seed) -> Self {
+        self.set_seed(seed);
+
+        self
+    }
+
+    #[inline]
+    pub fn get_counter(&self) -> u32 {
+        self.core.get_counter()
+    }
+
+    #[inline]
+    pub fn set_counter(&mut self, counter: u32) {
+        self.core.set_counter(counter);
+    }
+
+    #[inline]
+    pub fn with_counter(mut self, counter: u32) -> Self {
+        self.set_counter(counter);
+
+        self
     }
 
     #[inline]
@@ -48,34 +100,10 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_counter(&self) -> u32 {
-        self.core.get_counter()
-    }
+    pub fn with_stream_id(mut self, stream_id: &StreamId) -> Self {
+        self.set_stream_id(stream_id);
 
-    pub fn set_counter(&mut self, counter: u32) {
-        self.core.set_counter(counter);
-    }
-
-    #[inline]
-    pub fn get_seed(&self) -> &Seed {
-        Seed::from_words_ref(self.core.get_key())
-    }
-
-    #[inline]
-    pub fn set_seed<S>(&mut self, seed: S)
-    where
-        S: Into<[u8; KEY_LEN]>,
-    {
-        self.core.set_key(seed.into());
-    }
-
-    #[inline]
-    pub fn get_constants(&self) -> &Constants {
-        Constants::from_words_ref(self.core.get_constants())
-    }
-
-    pub fn set_constants(&mut self, constants: &Constants) {
-        self.core.set_constants(constants.bytes());
+        self
     }
 
     pub fn fill_bytes(&mut self, mut dst: &mut [u8]) {

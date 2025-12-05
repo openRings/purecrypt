@@ -56,9 +56,3 @@ pub(crate) fn diagonal_round(state: &mut [u32; STATE_LEN_WORDS]) {
     quarter_round(state, 2, 7, 8, 13);
     quarter_round(state, 3, 4, 9, 14);
 }
-
-#[inline(always)]
-pub(crate) fn full_round(state: &mut [u32; STATE_LEN_WORDS]) {
-    column_round(state);
-    diagonal_round(state);
-}

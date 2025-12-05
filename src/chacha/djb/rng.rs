@@ -42,23 +42,20 @@ impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_stream_id(&self) -> u64 {
-        self.core.get_nonce()
+    pub fn get_constants(&self) -> &Constants {
+        Constants::from_words_ref(self.core.get_constants())
     }
 
     #[inline]
-    pub fn set_stream_id(&mut self, stream_id: u64) {
-        self.core.set_nonce(stream_id);
+    pub fn set_constants(&mut self, constants: &Constants) {
+        self.core.set_constants(constants.bytes());
     }
 
     #[inline]
-    pub fn get_counter(&self) -> u64 {
-        self.core.get_counter()
-    }
+    pub fn with_constants(mut self, constants: &Constants) -> Self {
+        self.set_constants(constants);
 
-    #[inline]
-    pub fn set_counter(&mut self, counter: u64) {
-        self.core.set_counter(counter);
+        self
     }
 
     #[inline]
@@ -72,13 +69,44 @@ impl<const ROUNDS: usize> DjbChaChaRng<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_constants(&self) -> &Constants {
-        Constants::from_words_ref(self.core.get_constants())
+    pub fn with_seed(mut self, seed: &Seed) -> Self {
+        self.set_seed(seed);
+
+        self
     }
 
     #[inline]
-    pub fn set_constants(&mut self, constants: &Constants) {
-        self.core.set_constants(constants.bytes());
+    pub fn get_counter(&self) -> u64 {
+        self.core.get_counter()
+    }
+
+    #[inline]
+    pub fn set_counter(&mut self, counter: u64) {
+        self.core.set_counter(counter);
+    }
+
+    #[inline]
+    pub fn with_counter(mut self, counter: u64) -> Self {
+        self.set_counter(counter);
+
+        self
+    }
+
+    #[inline]
+    pub fn get_stream_id(&self) -> u64 {
+        self.core.get_nonce()
+    }
+
+    #[inline]
+    pub fn set_stream_id(&mut self, stream_id: u64) {
+        self.core.set_nonce(stream_id);
+    }
+
+    #[inline]
+    pub fn with_stream_id(mut self, stream_id: u64) -> Self {
+        self.set_stream_id(stream_id);
+
+        self
     }
 
     pub fn fill_bytes(&mut self, mut dst: &mut [u8]) {

@@ -6,6 +6,7 @@ use crate::chacha::consts::*;
 use crate::chacha::{column_round, diagonal_round};
 use crate::utils::{bytes_to_words, words_to_bytes};
 
+#[derive(Clone)]
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
 pub struct DjbChaChaCore<const ROUNDS: usize>([u32; STATE_LEN_WORDS]);
 

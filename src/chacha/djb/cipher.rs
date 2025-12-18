@@ -1,24 +1,25 @@
 #[cfg(feature = "zeroize")]
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-use super::core::IETFChaChaCore;
-use super::{ChaChaCore, Nonce};
-use crate::chacha::consts::*;
+use crate::chacha::consts::OUTPUT_LEN;
 use crate::chacha::{Constants, Key};
 use crate::utils::xor_keystream;
 
+use super::DjbChaChaCore;
+use super::types::Nonce;
+
 #[derive(Clone)]
 #[cfg_attr(feature = "zeroize", derive(Zeroize, ZeroizeOnDrop))]
-pub struct IETFChaCha<const ROUNDS: usize> {
-    core: ChaChaCore<ROUNDS>,
+pub struct DjbChaCha<const ROUNDS: usize> {
+    core: DjbChaChaCore<ROUNDS>,
     buffer: [u8; OUTPUT_LEN],
     buffer_pos: usize,
 }
 
-impl<const ROUNDS: usize> IETFChaCha<ROUNDS> {
+impl<const ROUNDS: usize> DjbChaCha<ROUNDS> {
     pub fn new(key: &Key, nonce: &Nonce) -> Self {
         let buffer = [0; OUTPUT_LEN];
-        let core = IETFChaChaCore::new(key.bytes(), nonce.bytes());
+        let core = DjbChaChaCore::new(key.bytes(), nonce.as_u64());
         let buffer_pos = buffer.len();
 
         Self {
@@ -63,30 +64,30 @@ impl<const ROUNDS: usize> IETFChaCha<ROUNDS> {
     }
 
     #[inline]
-    pub fn get_counter(&self) -> u32 {
+    pub fn get_counter(&self) -> u64 {
         self.core.get_counter()
     }
 
     #[inline]
-    pub fn set_counter(&mut self, counter: u32) {
+    pub fn set_counter(&mut self, counter: u64) {
         self.core.set_counter(counter);
     }
 
     #[inline]
-    pub fn with_counter(mut self, counter: u32) -> Self {
+    pub fn with_counter(mut self, counter: u64) -> Self {
         self.set_counter(counter);
 
         self
     }
 
     #[inline]
-    pub fn get_nonce(&self) -> &Nonce {
-        Nonce::from_words_ref(self.core.get_nonce())
+    pub fn get_nonce(&self) -> u64 {
+        self.core.get_nonce()
     }
 
     #[inline]
     pub fn set_nonce(&mut self, nonce: &Nonce) {
-        self.core.set_nonce(nonce.bytes());
+        self.core.set_nonce(nonce.as_u64());
     }
 
     #[inline]

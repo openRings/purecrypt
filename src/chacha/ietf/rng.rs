@@ -107,7 +107,7 @@ impl<const ROUNDS: usize> IETFChaChaRng<ROUNDS> {
     }
 
     pub fn fill_bytes(&mut self, mut dst: &mut [u8]) {
-        const BLOCK_SIZE: usize = 64;
+        const BLOCK_SIZE: usize = OUTPUT_LEN;
 
         // use the remaining buffer
         if self.buffer_pos < BLOCK_SIZE {

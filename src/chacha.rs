@@ -3,6 +3,7 @@ use std::ops::BitXor;
 use self::consts::*;
 
 pub use self::djb::{DjbChaCha8Rng, DjbChaCha12Rng, DjbChaCha20Rng, DjbChaChaRng};
+pub use self::ietf::{ChaCha, ChaCha8, ChaCha12, ChaCha20};
 pub use self::ietf::{ChaCha8Rng, ChaCha12Rng, ChaCha20Rng, ChaChaRng};
 pub use self::types::{Constants, Key, Seed};
 

@@ -22,6 +22,11 @@ pub(crate) fn words_to_bytes(src: &[u32], dst: &mut [u8]) {
 }
 
 #[inline(always)]
+pub(crate) fn xor_keystream(key: &[u8], dst: &mut [u8]) {
+    dst.iter_mut().zip(key).for_each(|(d, k)| *d ^= *k);
+}
+
+#[inline(always)]
 #[allow(dead_code)]
 pub(crate) const fn bytes4_to_word(bytes: [u8; 4]) -> u32 {
     (bytes[0] as u32)

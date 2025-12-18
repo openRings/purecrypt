@@ -8,9 +8,15 @@ const NONCE_LEN_WORDS: usize = NONCE_LEN / 4;
 const COUNTER_RANGE: Range<usize> = 12..13;
 const NONCE_RANGE: Range<usize> = 13..16;
 
+mod cipher;
 mod core;
 mod rng;
 mod types;
+
+pub type ChaCha<const ROUNDS: usize> = cipher::IETFChaCha<ROUNDS>;
+pub type ChaCha8 = ChaCha<8>;
+pub type ChaCha12 = ChaCha<12>;
+pub type ChaCha20 = ChaCha<20>;
 
 pub type ChaChaRng<const ROUNDS: usize> = rng::IETFChaChaRng<ROUNDS>;
 pub type ChaCha8Rng = ChaChaRng<8>;
